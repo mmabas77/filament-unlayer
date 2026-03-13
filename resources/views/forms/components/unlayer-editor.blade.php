@@ -2,14 +2,13 @@
     :component="$getFieldWrapperView()"
     :field="$field"
 >
-    @pushOnce('scripts')
-        <script src="https://editor.unlayer.com/embed.js"></script>
+    @pushOnce('styles')
+        <link rel="stylesheet" href="{{ asset('vendor/filament-unlayer/grapes.min.css') }}"/>
     @endPushOnce
 
     @php
-        $editorId  = 'ue_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $getId());
+        $editorId  = 'ge_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $getId());
         $statePath = $getStatePath();
-        $projectId = config('filament-unlayer.unlayer_project_id', '');
         $mergeTags = $getMergeTags();
     @endphp
 
@@ -18,40 +17,46 @@
     (function () {
         var COMPONENT    = {{ \Illuminate\Support\Js::from($editorId) }};
         var STATE_PATH   = {{ \Illuminate\Support\Js::from($statePath) }};
-        var PROJECT_ID   = {{ \Illuminate\Support\Js::from($projectId) }};
         var MERGE_TAGS   = {{ \Illuminate\Support\Js::from($mergeTags) }};
-        var CONTAINER_ID = 'unlayer-editor-' + COMPONENT;
+        var CONTAINER_ID = 'gjs-editor-' + COMPONENT;
 
-        function makeUnlayerComponent() {
+        // Load GrapesJS scripts once (self-hosted, no CDN)
+        function loadScripts(urls, callback) {
+            var loaded = 0;
+            urls.forEach(function (url) {
+                if (document.querySelector('script[src="' + url + '"]')) {
+                    loaded++;
+                    if (loaded === urls.length) callback();
+                    return;
+                }
+                var s = document.createElement('script');
+                s.src = url;
+                s.onload = function () {
+                    loaded++;
+                    if (loaded === urls.length) callback();
+                };
+                document.head.appendChild(s);
+            });
+        }
+
+        var BASE = '{{ asset('vendor/filament-unlayer') }}';
+
+        function makeGrapesComponent() {
             return {
-                unlayerReady: false,
+                editorReady: false,
                 isSaving: false,
                 initialLoadDone: false,
+                _changeTimer: null,
 
                 init: function () {
                     var self = this;
 
-                    function startBootstrap() {
-                        if (!window.unlayer) { setTimeout(startBootstrap, 100); return; }
+                    loadScripts([
+                        BASE + '/grapes.min.js',
+                        BASE + '/grapesjs-preset-newsletter.js',
+                    ], function () {
                         self.bootEditor();
-                    }
-                    startBootstrap();
-
-                    // Observe dark mode changes to update Unlayer theme dynamically
-                    const observer = new MutationObserver(function (mutations) {
-                        mutations.forEach(function (mutation) {
-                            if (mutation.attributeName === 'class') {
-                                var isDark = document.documentElement.classList.contains('dark');
-                                var instance = self.getEditorInstance();
-                                if (instance) {
-                                    instance.setAppearance({ theme: isDark ? 'modern_dark' : 'modern_light' });
-                                } else if (window.unlayer) {
-                                    unlayer.setTheme(isDark ? 'modern_dark' : 'modern_light');
-                                }
-                            }
-                        });
                     });
-                    observer.observe(document.documentElement, { attributes: true });
 
                     document.addEventListener('submit', function (e) {
                         var container = document.getElementById(CONTAINER_ID);
@@ -63,7 +68,6 @@
                     document.addEventListener('click', function (e) {
                         var btn = e.target.closest('button.fi-btn, button[type="submit"]');
                         if (!btn) return;
-
                         var text = btn.innerText.trim();
                         if (text.includes('Save') || text.includes('Create')) {
                             var container = document.getElementById(CONTAINER_ID);
@@ -77,9 +81,8 @@
 
                 handleInterceptedSave: function (e) {
                     if (this.isSaving) return;
-
-                    var instance = this.getEditorInstance();
-                    if (!instance || !this.unlayerReady) return;
+                    var editor = this.getEditor();
+                    if (!editor || !this.editorReady) return;
 
                     e.preventDefault();
                     e.stopImmediatePropagation();
@@ -87,95 +90,101 @@
                     this.isSaving = true;
                     var self = this;
 
-                    instance.exportHtml(function (data) {
-                        self.$wire.call('syncUnlayerExport', data.html, data.design)
-                            .finally(function () {
-                                self.isSaving = false;
-                            });
-                    });
+                    var html   = editor.runCommand('gjs-get-inlined-html');
+                    var design = editor.getProjectData();
+
+                    this.$wire.call('syncUnlayerExport', html, design)
+                        .finally(function () {
+                            self.isSaving = false;
+                        });
                 },
 
-                getEditorInstance: function () {
-                    return (window.unlayer_editors && window.unlayer_editors[CONTAINER_ID])
-                        ? window.unlayer_editors[CONTAINER_ID]
+                getEditor: function () {
+                    return (window._gjs_editors && window._gjs_editors[CONTAINER_ID])
+                        ? window._gjs_editors[CONTAINER_ID]
                         : null;
                 },
 
                 loadDesign: function (rawState) {
-                    var instance = this.getEditorInstance();
-                    if (!instance || !this.unlayerReady || !rawState) return;
+                    var editor = this.getEditor();
+                    if (!editor || !this.editorReady || !rawState) return;
                     try {
                         var parsed = (typeof rawState === 'string') ? JSON.parse(rawState) : rawState;
                         var design = parsed.design || null;
                         var html   = parsed.html   || '';
 
-                        if (design) {
-                            instance.loadDesign(design);
+                        // GrapesJS project data has a 'pages' key
+                        // Unlayer legacy data has a 'body' key — fall back to HTML
+                        if (design && design.pages) {
+                            editor.loadProjectData(design);
                         } else if (html) {
-                            instance.loadHtml(html);
+                            editor.setComponents(html);
                         }
 
                         var self = this;
                         setTimeout(function () { self.initialLoadDone = true; }, 1500);
                     } catch (err) {
-                        console.error('[UnlayerEditor] Load failed:', err);
+                        console.error('[GrapesEditor] Load failed:', err);
                         this.initialLoadDone = true;
                     }
                 },
 
                 bootEditor: function () {
-                    if (window.unlayer_editors && window.unlayer_editors[CONTAINER_ID]) return;
-                    window.unlayer_editors = window.unlayer_editors || {};
+                    if (window._gjs_editors && window._gjs_editors[CONTAINER_ID]) return;
+                    window._gjs_editors = window._gjs_editors || {};
+
                     var container = document.getElementById(CONTAINER_ID);
                     if (!container) return;
-                    container.innerHTML = '';
+
                     var self = this;
-                    setTimeout(function () {
-                        try {
-                            var isDarkMode = document.documentElement.classList.contains('dark');
-                            var editorConfig = {
-                                id: CONTAINER_ID,
-                                displayMode: 'email',
-                                mergeTags: MERGE_TAGS,
-                                appearance: {
-                                    theme: isDarkMode ? 'modern_dark' : 'modern_light',
-                                },
-                            };
+                    var plugin = window['grapesjs-preset-newsletter'];
 
-                            if (PROJECT_ID && PROJECT_ID !== 'null' && PROJECT_ID !== '0') {
-                                editorConfig.projectId = PROJECT_ID;
-                            }
+                    try {
+                        var editor = grapesjs.init({
+                            container: '#' + CONTAINER_ID,
+                            height: '100%',
+                            storageManager: false,
+                            plugins: [plugin],
+                            pluginsOpts: {
+                                [plugin]: {
+                                    inlineCss: true,
+                                    showBlocksOnLoad: true,
+                                }
+                            },
+                        });
 
-                            window.unlayer_editors[CONTAINER_ID] = unlayer.createEditor(editorConfig);
-                            var instance = self.getEditorInstance();
+                        window._gjs_editors[CONTAINER_ID] = editor;
+                        self.editorReady = true;
 
-                            instance.addEventListener('editor:ready', function () {
-                                self.unlayerReady = true;
-                                setTimeout(function () {
-                                    var raw = self.$wire.get(STATE_PATH);
-                                    self.loadDesign(raw);
-                                }, 300);
-                            });
+                        // Load existing design once editor is ready
+                        editor.on('load', function () {
+                            var raw = self.$wire.get(STATE_PATH);
+                            self.loadDesign(raw);
+                        });
 
-                            instance.addEventListener('design:updated', function () {
-                                if (!self.initialLoadDone) return;
-                                instance.exportHtml(function (data) {
-                                    self.$wire.set(STATE_PATH, JSON.stringify({
-                                        design: data.design,
-                                        html:   data.html,
-                                    }), false);
-                                });
-                            });
-                        } catch (e) {
-                            console.error('[UnlayerEditor] Boot error:', e);
-                        }
-                    }, 100);
+                        // Debounced auto-sync on any change
+                        editor.on('update', function () {
+                            if (!self.initialLoadDone) return;
+                            clearTimeout(self._changeTimer);
+                            self._changeTimer = setTimeout(function () {
+                                var html   = editor.runCommand('gjs-get-inlined-html');
+                                var design = editor.getProjectData();
+                                self.$wire.set(STATE_PATH, JSON.stringify({
+                                    design: design,
+                                    html:   html,
+                                }), false);
+                            }, 600);
+                        });
+
+                    } catch (e) {
+                        console.error('[GrapesEditor] Boot error:', e);
+                    }
                 },
             };
         }
 
         function register() {
-            Alpine.data(COMPONENT, makeUnlayerComponent);
+            Alpine.data(COMPONENT, makeGrapesComponent);
         }
 
         if (window.Alpine && window.Alpine.data) {
@@ -190,10 +199,9 @@
     <div
         x-data="{{ $editorId }}"
         wire:ignore
-        class="border border-gray-300 rounded-lg overflow-hidden shadow-sm dark:border-gray-700 bg-white dark:bg-gray-900"
+        class="border border-gray-300 rounded-lg overflow-hidden shadow-sm dark:border-gray-700"
         style="height: 750px;"
     >
-        {{-- Extra 40px hides the "⚡ by Unlayer Editor" branding bar via overflow:hidden on the parent --}}
-        <div id="unlayer-editor-{{ $editorId }}" style="height: 790px; width: 100%;"></div>
+        <div id="gjs-editor-{{ $editorId }}" style="height: 100%; width: 100%;"></div>
     </div>
 </x-dynamic-component>
