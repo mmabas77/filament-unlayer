@@ -44,7 +44,7 @@
                                 var isDark = document.documentElement.classList.contains('dark');
                                 var instance = self.getEditorInstance();
                                 if (instance) {
-                                    instance.setAppearance({ theme: isDark ? 'modern_dark' : 'modern_light' });
+                                    instance.setAppearance({ theme: isDark ? 'modern_dark' : 'modern_light', customCSS: ['.blockbuilder-branding { display: none !important; }'] });
                                 } else if (window.unlayer) {
                                     unlayer.setTheme(isDark ? 'modern_dark' : 'modern_light');
                                 }
@@ -138,7 +138,8 @@
                                 displayMode: 'email',
                                 mergeTags: MERGE_TAGS,
                                 appearance: {
-                                    theme: isDarkMode ? 'modern_dark' : 'modern_light'
+                                    theme: isDarkMode ? 'modern_dark' : 'modern_light',
+                                    customCSS: ['.blockbuilder-branding { display: none !important; }']
                                 },
                             };
 
