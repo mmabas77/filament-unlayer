@@ -1,0 +1,37 @@
+{
+    "name": "mmabas77/filament-unlayer",
+    "description": "Unlayer drag-and-drop email editor field for Filament v4+",
+    "keywords": ["filament", "laravel", "unlayer", "email", "editor", "filament-plugin"],
+    "homepage": "https://github.com/mmabas77/filament-unlayer",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Mahmoud Abas",
+            "email": "mmabas77@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "filament/filament": "^4.0|^5.0",
+        "spatie/laravel-package-tools": "^1.16",
+        "illuminate/contracts": "^11.0|^12.0",
+        "illuminate/support": "^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Mmabas77\\FilamentUnlayer\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Mmabas77\\FilamentUnlayer\\FilamentUnlayerServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
