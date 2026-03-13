@@ -44,7 +44,7 @@
                                 var isDark = document.documentElement.classList.contains('dark');
                                 var instance = self.getEditorInstance();
                                 if (instance) {
-                                    instance.setAppearance({ theme: isDark ? 'modern_dark' : 'modern_light', customCSS: ['[class*="branding"],[class*="powered"],[id*="branding"],[id*="powered"] { display: none !important; }'] });
+                                    instance.setAppearance({ theme: isDark ? 'modern_dark' : 'modern_light' });
                                 } else if (window.unlayer) {
                                     unlayer.setTheme(isDark ? 'modern_dark' : 'modern_light');
                                 }
@@ -139,7 +139,6 @@
                                 mergeTags: MERGE_TAGS,
                                 appearance: {
                                     theme: isDarkMode ? 'modern_dark' : 'modern_light',
-                                    customCSS: ['[class*="branding"],[class*="powered"],[id*="branding"],[id*="powered"] { display: none !important; }']
                                 },
                             };
 
@@ -192,7 +191,9 @@
         x-data="{{ $editorId }}"
         wire:ignore
         class="border border-gray-300 rounded-lg overflow-hidden shadow-sm dark:border-gray-700 bg-white dark:bg-gray-900"
+        style="height: 750px;"
     >
-        <div id="unlayer-editor-{{ $editorId }}" style="height: 750px; width: 100%;"></div>
+        {{-- Extra 40px hides the "⚡ by Unlayer Editor" branding bar via overflow:hidden on the parent --}}
+        <div id="unlayer-editor-{{ $editorId }}" style="height: 790px; width: 100%;"></div>
     </div>
 </x-dynamic-component>
