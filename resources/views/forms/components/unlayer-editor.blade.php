@@ -16,10 +16,10 @@
     @push('scripts')
     <script>
     (function () {
-        var COMPONENT    = {{ Js::from($editorId) }};
-        var STATE_PATH   = {{ Js::from($statePath) }};
-        var PROJECT_ID   = {{ Js::from($projectId) }};
-        var MERGE_TAGS   = {{ Js::from($mergeTags) }};
+        var COMPONENT    = {{ \Illuminate\Support\Js::from($editorId) }};
+        var STATE_PATH   = {{ \Illuminate\Support\Js::from($statePath) }};
+        var PROJECT_ID   = {{ \Illuminate\Support\Js::from($projectId) }};
+        var MERGE_TAGS   = {{ \Illuminate\Support\Js::from($mergeTags) }};
         var CONTAINER_ID = 'unlayer-editor-' + COMPONENT;
 
         function makeUnlayerComponent() {
