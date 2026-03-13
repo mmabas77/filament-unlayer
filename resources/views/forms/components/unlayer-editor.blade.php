@@ -199,8 +199,9 @@
     <div
         x-data="{{ $editorId }}"
         wire:ignore
+        dir="ltr"
         class="border border-gray-300 rounded-lg overflow-hidden shadow-sm dark:border-gray-700"
-        style="height: 750px;"
+        style="height: 750px; direction: ltr; unicode-bidi: isolate;"
     >
         <div id="gjs-editor-{{ $editorId }}" style="height: 100%; width: 100%;"></div>
     </div>
